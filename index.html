@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="fa" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>حل‌کننده سودوکو خفن پلاس — شیشه‌ای (کنترل با کیبورد)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    /* --- General Styles --- */
+    html, body { height: 100%; }
+    body { 
+      font-family: 'Vazirmatn', system-ui, -apple-system, "Segoe UI", Roboto, 'Helvetica Neue', Arial;
+      transition: background-color 0.4s, color 0.4s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* --- Themes --- */
+    body { /* Dark Theme (Default) */
+      background-color: #0f172a; /* slate-900 */
+      color: #e2e8f0; /* slate-200 */
+    }
+    .main-gradient { background-image: linear-gradient(to bottom, var(--tw-gradient-stops)); --tw-gradient-from: #0f172a; --tw-gradient-to: #312e81; }
+    .glass-panel { background-color: rgba(255, 255, 255, 0.06); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .grid-bg { background-color: rgba(255, 255, 255, 0.05); }
+    .grid-border { border-color: rgba(255, 255, 255, 0.1); }
+    .header-text { color: #67e8f9; } /* cyan-300 */
+    .subtle-text { color: rgba(203, 213, 225, 0.7); } /* slate-300/70 */
+    .numpad-btn-bg { background-color: rgba(255,255,255,0.08); }
+    .numpad-btn-bg:hover { background-color: rgba(255,255,255,0.15); }
+
+    body.light-theme { /* Light Theme */
+      background-color: #f1f5f9; /* slate-100 */
+      color: #1e293b; /* slate-800 */
+    }
+    body.light-theme .main-gradient { background-image: linear-gradient(to bottom, var(--tw-gradient-stops)); --tw-gradient-from: #e0f2fe; --tw-gradient-to: #dbeafe; }
+    body.light-theme .glass-panel { background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(0, 0, 0, 0.1); }
+    body.light-theme .grid-bg { background-color: rgba(0, 0, 0, 0.05); }
+    body.light-theme .grid-border { border-color: rgba(0, 0, 0, 0.15); }
+    body.light-theme .header-text { color: #0891b2; } /* cyan-600 */
+    body.light-theme .subtle-text { color: #475569; } /* slate-600 */
+    body.light-theme .numpad-btn-bg { background-color: rgba(0,0,0,0.06); }
+    body.light-theme .numpad-btn-bg:hover { background-color: rgba(0,0,0,0.1); }
+
+    /* --- Animation & Interactive States --- */
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    
+    /* Cell Styles */
+    td { position: relative; cursor: pointer; transition: background-color 0.2s; }
+    .cell-main-val {
+        position: absolute; top:0; left:0; width: 100%; height:100%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.5rem; font-weight: bold;
+    }
+    .cell-notes {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        width: 100%; height: 100%;
+        font-size: 0.6rem; line-height: 1; color: #a1a1aa; /* zinc-400 */
+    }
+    .cell-notes > div { display: flex; align-items: center; justify-content: center; }
+    .given { color: #0ea5e9; } /* sky-500 */
+    .solved { color: #f97316; } /* orange-500 */
+    .hinted { color: #8b5cf6; } /* violet-500 */
+    .user-val { color: inherit; }
+
+    .active-cell { background-color: rgba(34, 197, 94, 0.25); }
+    .highlight { background-color: rgba(34, 197, 94, 0.15); }
+    .peer-highlight { background-color: rgba(255, 255, 255, 0.08); } 
+    body.light-theme .peer-highlight { background-color: rgba(0, 0, 0, 0.07); }
+    .incorrect { background-color: rgba(220, 38, 38, 0.5) !important; border-radius: 0.25rem; transition: background-color 0.2s; }
+    .btn-toggle.active { background-color: #10b981; color: white; } /* emerald-500 */
+
+    /* Custom Toggle Switch */
+    input[type="checkbox"].toggle {
+        -webkit-appearance: none; appearance: none;
+        width: 40px; height: 20px;
+        background-color: rgba(100, 116, 139, 0.5); /* slate-500/50 */
+        border-radius: 9999px; cursor: pointer; position: relative;
+        transition: background-color 0.3s ease;
+    }
+    input[type="checkbox"].toggle::before {
+        content: ""; position: absolute;
+        width: 16px; height: 16px; top: 2px; left: 2px;
+        background-color: white; border-radius: 50%;
+        transition: transform 0.3s ease;
+    }
+    input[type="checkbox"].toggle:checked { background-color: #22c55e; } /* green-500 */
+    input[type="checkbox"].toggle:checked::before { transform: translateX(20px); }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 main-gradient">
+  <canvas id="confetti-canvas" class="absolute top-0 left-0 w-full h-full pointer-events-none"></canvas>
+  <div class="w-full max-w-6xl">
+    <header class="mb-4 text-center">
+      <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight header-text drop-shadow-lg">حل‌کننده سودوکو خفن پلاس</h1>
+      <div class="flex items-center justify-center gap-4 mt-2">
+        <p class="text-sm subtle-text">نسخهٔ پیشرفته با قابلیت‌های جدید</p>
+        <div class="flex items-center gap-2">
+            <span class="text-xs subtle-text">روشن</span>
+            <input type="checkbox" id="theme-toggle" class="toggle">
+        </div>
+      </div>
+    </header>
+
+    <div class="flex justify-center items-center gap-4 md:gap-8 mb-4 text-sm md:text-base">
+        <div><span class="subtle-text">درجه سختی: </span><strong id="difficulty-display" class="font-bold">متوسط</strong></div>
+        <div><span class="subtle-text">اشتباهات: </span><strong id="mistake-counter" class="font-bold">0</strong></div>
+    </div>
+
+
+    <main class="glass-panel rounded-2xl shadow-2xl p-4 md:p-6">
+      <div class="flex flex-col lg:flex-row items-start gap-6">
+        
+        <div class="mx-auto lg:mx-0">
+          <div id="grid-wrap" class="grid-bg rounded-xl p-2 md:p-3 shadow-inner">
+            <table id="sudoku-grid" class="w-[max-content] m-auto table-fixed select-none"></table>
+          </div>
+        </div>
+
+        <div class="flex-1 w-full flex flex-col gap-4">
+        
+            <div>
+                <h3 class="font-bold mb-2 subtle-text text-sm">ایجاد پازل جدید:</h3>
+                <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                    <button data-difficulty="40" data-difficulty-name="آسان" class="difficulty-btn px-3 py-2 rounded-lg text-sm font-semibold shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-green-500 to-emerald-400 text-white">آسان</button>
+                    <button data-difficulty="50" data-difficulty-name="متوسط" class="difficulty-btn px-3 py-2 rounded-lg text-sm font-semibold shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-yellow-500 to-amber-400 text-white">متوسط</button>
+                    <button data-difficulty="55" data-difficulty-name="سخت" class="difficulty-btn px-3 py-2 rounded-lg text-sm font-semibold shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-orange-500 to-red-400 text-white">سخت</button>
+                    <button data-difficulty="60" data-difficulty-name="بسیارسخت" class="difficulty-btn px-3 py-2 rounded-lg text-sm font-semibold shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-red-600 to-rose-500 text-white">بسیارسخت</button>
+                    <button data-difficulty="64" data-difficulty-name="شیطانی" class="difficulty-btn px-3 py-2 rounded-lg text-sm font-semibold shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-purple-600 to-indigo-500 text-white">شیطانی</button>
+                </div>
+            </div>
+
+            <hr class="border-t grid-border my-1">
+            
+            <div>
+                <h3 class="font-bold mb-2 subtle-text text-sm">ورودی و عملیات اصلی:</h3>
+                <div class="grid grid-cols-5 gap-2">
+                    <button class="col-span-3 text-sm font-semibold py-2 rounded-lg shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-red-500 to-rose-400 text-white" id="clearBtn">پاک کردن</button>
+                    <button class="col-span-2 text-sm font-semibold py-2 rounded-lg shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-sky-500 to-indigo-400 text-white" id="checkBtn">بررسی</button>
+                    
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">1</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">2</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">3</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">4</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">5</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">6</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">7</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">8</button>
+                    <button class="numpad-btn numpad-btn-bg text-xl font-bold rounded-lg aspect-square transition transform hover:scale-105">9</button>
+
+                    <button id="notes-toggle" class="numpad-btn btn-toggle numpad-btn-bg rounded-lg aspect-square transition transform hover:scale-105 text-2xl">✏️</button>
+                    <button class="numpad-btn numpad-btn-bg rounded-lg aspect-square transition transform hover:scale-105 text-2xl" data-value="0">🗑️</button>
+                </div>
+            </div>
+
+            <hr class="border-t grid-border my-1">
+            
+            <div>
+                <h3 class="font-bold mb-2 subtle-text text-sm">ابزارهای کمکی و گزینه‌ها:</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="hintBtn" class="px-3 py-2 rounded-lg font-semibold shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-violet-500 to-purple-400 text-white">راهنمایی</button>
+                    <button id="solveBtn" class="px-3 py-2 rounded-lg font-semibold shadow-md transition-transform transform hover:-translate-y-0.5 bg-gradient-to-r from-emerald-500 to-lime-400 text-slate-900">حل کامل</button>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <div class="flex items-center gap-2">
+                          <button id="undoBtn" class="flex-1 px-3 py-1 rounded-md numpad-btn-bg disabled:opacity-50" disabled>↩️ بازگشت</button>
+                          <button id="redoBtn" class="flex-1 px-3 py-1 rounded-md numpad-btn-bg disabled:opacity-50" disabled>↪️ تکرار</button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="live-check-toggle" class="toggle">
+                        <label for="live-check-toggle" class="text-xs subtle-text">بررسی آنی خطاها</label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script>
+/*
+* SUDOKU SOLVER - Script Organization
+* ------------------------------------
+* 1.  STATE MANAGEMENT & CONSTANTS
+* 2.  INITIALIZATION
+* 3.  EVENT LISTENERS & HANDLERS
+* 4.  CORE GAME LOGIC
+* 5.  HISTORY (UNDO/REDO) MANAGEMENT
+* 6.  UI / RENDER FUNCTIONS
+* 7.  SUDOKU ALGORITHMS (GENERATOR/SOLVER)
+* 8.  STORAGE & OTHER FEATURES
+*/
+
+// =================================================================
+// 1. STATE MANAGEMENT & CONSTANTS
+// =================================================================
+
+const STORAGE_KEY = 'sudokuGameState_v3_no_timer'; // Updated key for local storage
+
+const sudokuState = {
+    solutionBoard: null,
+    currentBoard: [],
+    notesBoard: [],
+    activeCell: { row: -1, col: -1 },
+    isNotesMode: false,
+    liveCheck: false,
+    history: [],
+    historyIndex: -1,
+    mistakeCount: 0,
+    currentDifficultyName: '',
+};
+
+// =================================================================
+// 2. INITIALIZATION
+// =================================================================
+
+// --- DOM Elements ---
+const gridEl = document.getElementById('sudoku-grid');
+const themeToggle = document.getElementById('theme-toggle');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const mistakeCounterEl = document.getElementById('mistake-counter');
+const difficultyDisplayEl = document.getElementById('difficulty-display');
+const liveCheckToggle = document.getElementById('live-check-toggle');
+
+// --- Initial Load ---
+window.onload = () => {
+    createGrid();
+    setupEventListeners();
+    if (!loadGameFromStorage()) {
+        loadNewPuzzle(50, 'متوسط'); // Load a medium puzzle by default
+    }
+};
+
+// =================================================================
+// 3. EVENT LISTENERS & HANDLERS
+// =================================================================
+
+function setupEventListeners() {
+    // New puzzle buttons
+    document.querySelectorAll('.difficulty-btn').forEach(btn => 
+        btn.addEventListener('click', () => {
+            if (confirm('آیا مطمئن هستید؟ پیشرفت فعلی شما از دست خواهد رفت.')) {
+                loadNewPuzzle(parseInt(btn.dataset.difficulty), btn.dataset.difficultyName);
+            }
+        })
+    );
+    
+    // Main action buttons
+    document.getElementById('solveBtn').addEventListener('click', solveSudoku);
+    document.getElementById('clearBtn').addEventListener('click', clearUserEntries);
+    document.getElementById('hintBtn').addEventListener('click', getHint);
+    document.getElementById('checkBtn').addEventListener('click', () => checkErrors(false));
+    
+    // Numpad and toggles
+    document.getElementById('notes-toggle').addEventListener('click', toggleNotesMode);
+    document.querySelector('.numpad-btn[data-value="0"]').addEventListener('click', () => handleNumpadInput(0));
+    document.querySelectorAll('.numpad-btn:not([data-value]):not(#notes-toggle)').forEach(btn => {
+        if (!isNaN(parseInt(btn.textContent))) {
+            btn.addEventListener('click', () => handleNumpadInput(parseInt(btn.textContent)));
+        }
+    });
+
+    // Board interaction
+    gridEl.addEventListener('click', handleCellClick);
+    
+    // Options & Theme
+    themeToggle.addEventListener('change', () => {
+        document.body.classList.toggle('light-theme');
+        localStorage.setItem('sudokuTheme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+    });
+    if (localStorage.getItem('sudokuTheme') === 'light') {
+        document.body.classList.add('light-theme');
+        themeToggle.checked = true;
+    }
+    
+    liveCheckToggle.addEventListener('change', (e) => {
+        sudokuState.liveCheck = e.target.checked;
+        if(sudokuState.liveCheck) {
+             checkErrors(true);
+        } else {
+             removeAllErrorHighlights();
+        }
+        saveGameToStorage();
+    });
+    
+    // History
+    undoBtn.addEventListener('click', undo);
+    redoBtn.addEventListener('click', redo);
+
+    // Keyboard input listener
+    document.addEventListener('keydown', handleKeyPress);
+}
+
+function handleCellClick(e) {
+    const cell = e.target.closest('td');
+    if (!cell) return;
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+    setActiveCell(row, col);
+}
+
+function handleNumpadInput(value) {
+    const { row, col } = sudokuState.activeCell;
+    if (row === -1 || sudokuState.currentBoard[row][col].type === 'given') return;
+
+    if (sudokuState.isNotesMode) {
+        toggleNote(row, col, value);
+    } else {
+        setCellValue(row, col, value);
+    }
+    saveHistory();
+    saveGameToStorage(); 
+}
+
+function handleKeyPress(e) {
+    const { row, col } = sudokuState.activeCell;
+    
+    if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+        if (e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+        return;
+    }
+    
+    if (e.key.toLowerCase() === 'n') { e.preventDefault(); toggleNotesMode(); }
+    if (row === -1) return;
+
+    if (e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        handleNumpadInput(parseInt(e.key));
+    } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+        e.preventDefault();
+        handleNumpadInput(0);
+    } else if (e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        let newRow = row, newCol = col;
+        switch (e.key) {
+            case 'ArrowUp':    newRow = (row - 1 + 9) % 9; break;
+            case 'ArrowDown':  newRow = (row + 1) % 9; break;
+            case 'ArrowLeft':  newCol = (col - 1 + 9) % 9; break;
+            case 'ArrowRight': newCol = (col + 1) % 9; break;
+        }
+        setActiveCell(newRow, newCol);
+    }
+}
+
+
+// =================================================================
+// 4. CORE GAME LOGIC
+// =================================================================
+
+function loadNewPuzzle(emptyCount, difficultyName) {
+    resetState();
+    sudokuState.currentDifficultyName = difficultyName;
+    difficultyDisplayEl.textContent = difficultyName;
+
+    let board = generateFullBoard();
+    sudokuState.solutionBoard = JSON.parse(JSON.stringify(board));
+
+    let puzzleBoard = JSON.parse(JSON.stringify(board));
+    let attempts = emptyCount;
+    while (attempts > 0) {
+        let row = Math.floor(Math.random() * 9);
+        let col = Math.floor(Math.random() * 9);
+        if (puzzleBoard[row][col] !== 0) {
+            puzzleBoard[row][col] = 0;
+            attempts--;
+        }
+    }
+    
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            const val = puzzleBoard[i][j];
+            sudokuState.currentBoard[i][j] = { value: val, type: val !== 0 ? 'given' : 'empty' };
+        }
+    }
+    
+    renderBoard();
+    saveHistory();
+    saveGameToStorage();
+}
+
+function setCellValue(row, col, value) {
+    // Only check for mistakes if the cell's previous value was not the solution
+    const isAlreadyWrong = sudokuState.currentBoard[row][col].value !== 0 && 
+                           sudokuState.currentBoard[row][col].value !== sudokuState.solutionBoard[row][col];
+
+    sudokuState.currentBoard[row][col].value = value;
+    sudokuState.currentBoard[row][col].type = value !== 0 ? 'user' : 'empty';
+    
+    if (value !== 0) {
+        sudokuState.notesBoard[row][col].clear();
+        // Increment mistake counter only if it's a new mistake
+        if (sudokuState.liveCheck && value !== sudokuState.solutionBoard[row][col] && !isAlreadyWrong) {
+             sudokuState.mistakeCount++;
+             mistakeCounterEl.textContent = sudokuState.mistakeCount;
+        }
+    }
+    
+    renderCell(row, col);
+    setActiveCell(row, col); // Re-apply highlights
+    if(sudokuState.liveCheck) checkErrors(true);
+    checkWinCondition();
+}
+
+function toggleNote(row, col, noteValue) {
+    if (noteValue === 0) {
+        sudokuState.notesBoard[row][col].clear();
+    } else {
+        if (sudokuState.notesBoard[row][col].has(noteValue)) {
+            sudokuState.notesBoard[row][col].delete(noteValue);
+        } else {
+            sudokuState.notesBoard[row][col].add(noteValue);
+        }
+    }
+    sudokuState.currentBoard[row][col].value = 0;
+    sudokuState.currentBoard[row][col].type = 'empty';
+    renderCell(row, col);
+}
+
+function solveSudoku() {
+    if (!sudokuState.solutionBoard) return;
+    animateSolution(sudokuState.solutionBoard);
+    checkWinCondition();
+}
+
+function clearUserEntries() {
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if (sudokuState.currentBoard[i][j].type !== 'given') {
+                sudokuState.currentBoard[i][j] = { value: 0, type: 'empty' };
+                sudokuState.notesBoard[i][j] = new Set();
+            }
+        }
+    }
+    renderBoard();
+    saveHistory();
+    saveGameToStorage();
+}
+
+function getHint() {
+    if (!sudokuState.solutionBoard) return;
+    const emptyCells = [];
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if (sudokuState.currentBoard[i][j].value === 0) {
+                emptyCells.push({i, j});
+            }
+        }
+    }
+    if (emptyCells.length === 0) { alert('جدول کامل شده است!'); return; }
+
+    const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    const { i, j } = randomCell;
+    const solutionValue = sudokuState.solutionBoard[i][j];
+    
+    sudokuState.currentBoard[i][j] = { value: solutionValue, type: 'hinted' };
+    sudokuState.notesBoard[i][j].clear();
+
+    renderCell(i, j);
+    setActiveCell(i, j);
+    saveHistory();
+    saveGameToStorage();
+    checkWinCondition();
+}
+
+function checkErrors(isLive) {
+    removeAllErrorHighlights();
+    let errorCount = 0;
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            const cellState = sudokuState.currentBoard[i][j];
+            if ((cellState.type === 'user' || cellState.type === 'solved') && cellState.value !== sudokuState.solutionBoard[i][j]) {
+                errorCount++;
+                const cellEl = gridEl.rows[i].cells[j];
+                cellEl.classList.add('incorrect');
+                if (!isLive) {
+                    setTimeout(() => cellEl.classList.remove('incorrect'), 2000);
+                }
+            }
+        }
+    }
+    if (!isLive && sudokuState.solutionBoard) {
+        if (errorCount > 0) {
+            alert(`شما ${errorCount} خطا دارید که با رنگ قرمز مشخص شدند.`);
+        } else {
+            alert('آفرین! تمام اعداد وارد شده تا اینجا صحیح هستند.');
+        }
+    }
+}
+
+function checkWinCondition() {
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if (sudokuState.currentBoard[i][j].value !== sudokuState.solutionBoard[i][j]) {
+                return; // Board is not full or correct yet
+            }
+        }
+    }
+
+    // If we reach here, the board is solved
+    fireConfetti();
+    setTimeout(() => alert(`عالی بود! شما پازل را با موفقیت حل کردید!`), 200);
+    setActiveCell(-1, -1);
+    localStorage.removeItem(STORAGE_KEY); // Clear storage on win
+}
+
+// =================================================================
+// 5. HISTORY (UNDO/REDO) MANAGEMENT
+// =================================================================
+
+function saveHistory() {
+    const stateSnapshot = {
+        currentBoard: JSON.parse(JSON.stringify(sudokuState.currentBoard)),
+        notesBoard: sudokuState.notesBoard.map(row => row.map(s => Array.from(s))),
+        mistakeCount: sudokuState.mistakeCount,
+    };
+    
+    if (sudokuState.historyIndex < sudokuState.history.length - 1) {
+        sudokuState.history = sudokuState.history.slice(0, sudokuState.historyIndex + 1);
+    }
+    
+    sudokuState.history.push(stateSnapshot);
+    sudokuState.historyIndex++;
+    updateUndoRedoButtons();
+}
+
+function undo() {
+    if (sudokuState.historyIndex > 0) {
+        sudokuState.historyIndex--;
+        loadStateFromHistory();
+    }
+}
+
+function redo() {
+    if (sudokuState.historyIndex < sudokuState.history.length - 1) {
+        sudokuState.historyIndex++;
+        loadStateFromHistory();
+    }
+}
+
+function loadStateFromHistory() {
+    const snapshot = sudokuState.history[sudokuState.historyIndex];
+    sudokuState.currentBoard = JSON.parse(JSON.stringify(snapshot.currentBoard));
+    sudokuState.notesBoard = snapshot.notesBoard.map(row => row.map(arr => new Set(arr)));
+    sudokuState.mistakeCount = snapshot.mistakeCount;
+    
+    renderBoard();
+    mistakeCounterEl.textContent = sudokuState.mistakeCount;
+    if(sudokuState.liveCheck) checkErrors(true);
+    updateUndoRedoButtons();
+    saveGameToStorage();
+}
+
+// =================================================================
+// 6. UI / RENDER FUNCTIONS
+// =================================================================
+
+function createGrid() {
+    gridEl.innerHTML = '';
+    for (let i = 0; i < 9; i++) {
+        const row = gridEl.insertRow();
+        for (let j = 0; j < 9; j++) {
+            const cell = row.insertCell();
+            cell.className = 'w-10 h-10 md:w-12 md:h-12 grid-border border';
+            if ((j + 1) % 3 === 0 && j < 8) cell.style.borderRightWidth = '3px';
+            if ((i + 1) % 3 === 0 && i < 8) cell.style.borderBottomWidth = '3px';
+            cell.dataset.row = i;
+            cell.dataset.col = j;
+            cell.innerHTML = `
+                <div class="cell-notes">
+                    ${Array.from({length: 9}, (_, k) => `<div data-note="${k+1}"></div>`).join('')}
+                </div>
+                <div class="cell-main-val"></div>
+            `;
+        }
+    }
+}
+
+function renderBoard() {
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            renderCell(i, j);
+        }
+    }
+    setActiveCell(sudokuState.activeCell.row, sudokuState.activeCell.col);
+}
+
+function renderCell(row, col) {
+    const cellEl = gridEl.rows[row].cells[col];
+    const mainValEl = cellEl.querySelector('.cell-main-val');
+    const notesContainer = cellEl.querySelector('.cell-notes');
+    const cellState = sudokuState.currentBoard[row][col];
+
+    mainValEl.textContent = cellState.value !== 0 ? cellState.value : '';
+    mainValEl.className = 'cell-main-val'; 
+    if (cellState.type !== 'empty') {
+        mainValEl.classList.add(cellState.type);
+    }
+    
+    notesContainer.style.display = cellState.value !== 0 ? 'none' : 'grid';
+    const notes = sudokuState.notesBoard[row][col];
+    for(let n=1; n<=9; n++) {
+        const noteEl = notesContainer.querySelector(`[data-note="${n}"]`);
+        noteEl.textContent = notes.has(n) ? n : '';
+    }
+    
+    cellEl.classList.remove('incorrect');
+    if (sudokuState.liveCheck && (cellState.type === 'user' || cellState.type === 'solved') && cellState.value !== sudokuState.solutionBoard[row][col]) {
+        cellEl.classList.add('incorrect');
+    }
+}
+
+function setActiveCell(row, col) {
+    document.querySelectorAll('td.active-cell, td.peer-highlight, td.highlight').forEach(td => {
+        td.classList.remove('active-cell', 'peer-highlight', 'highlight');
+    });
+
+    sudokuState.activeCell = { row, col };
+    
+    if (row !== -1) {
+        const activeValue = sudokuState.currentBoard[row][col].value;
+        const blockRowStart = Math.floor(row / 3) * 3;
+        const blockColStart = Math.floor(col / 3) * 3;
+
+        for (let i = 0; i < 9; i++) {
+            for (let j = 0; j < 9; j++) {
+                const isPeer = (i === row || j === col || 
+                               (i >= blockRowStart && i < blockRowStart + 3 && j >= blockColStart && j < blockColStart + 3));
+                
+                if (isPeer) {
+                    gridEl.rows[i].cells[j].classList.add('peer-highlight');
+                }
+                if (activeValue !== 0 && sudokuState.currentBoard[i][j].value === activeValue) {
+                    gridEl.rows[i].cells[j].classList.add('highlight');
+                }
+            }
+        }
+        gridEl.rows[row].cells[col].classList.add('active-cell');
+    }
+}
+
+function animateSolution(solvedBoard) {
+    for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+            if (sudokuState.currentBoard[i][j].type !== 'given') {
+                ((row, col, val, delay) => {
+                    setTimeout(() => {
+                        sudokuState.currentBoard[row][col] = { value: val, type: 'solved' };
+                        sudokuState.notesBoard[row][col].clear();
+                        renderCell(row, col);
+                        gridEl.rows[row].cells[col].querySelector('.cell-main-val').classList.add('fade-in');
+                    }, delay);
+                })(i, j, solvedBoard[i][j], (i * 9 + j) * 15);
+            }
+        }
+    }
+    setTimeout(() => {
+      saveGameToStorage();
+      checkWinCondition();
+    }, (81 * 15) + 100);
+}
+
+function resetState() {
+    sudokuState.solutionBoard = null;
+    sudokuState.currentBoard = Array.from({ length: 9 }, () => Array(9).fill({ value: 0, type: 'empty' }));
+    sudokuState.notesBoard = Array.from({ length: 9 }, () => Array.from({ length: 9 }, () => new Set()));
+    sudokuState.activeCell = { row: -1, col: -1 };
+    sudokuState.isNotesMode = false;
+    document.getElementById('notes-toggle').classList.remove('active');
+    sudokuState.history = [];
+    sudokuState.historyIndex = -1;
+    sudokuState.mistakeCount = 0;
+    mistakeCounterEl.textContent = '0';
+    updateUndoRedoButtons();
+    removeAllErrorHighlights();
+}
+
+function toggleNotesMode() {
+    sudokuState.isNotesMode = !sudokuState.isNotesMode;
+    document.getElementById('notes-toggle').classList.toggle('active', sudokuState.isNotesMode);
+}
+
+function updateUndoRedoButtons() {
+    undoBtn.disabled = sudokuState.historyIndex <= 0;
+    redoBtn.disabled = sudokuState.historyIndex >= sudokuState.history.length - 1;
+}
+
+function removeAllErrorHighlights(){
+    gridEl.querySelectorAll('.incorrect').forEach(cell => cell.classList.remove('incorrect'));
+}
+
+function fireConfetti() {
+    const canvas = document.getElementById('confetti-canvas');
+    const myConfetti = confetti.create(canvas, { resize: true, useWorker: true });
+    myConfetti({ particleCount: 150, spread: 180, origin: { y: 0.6 } });
+}
+
+// =================================================================
+// 7. SUDOKU ALGORITHMS (GENERATOR/SOLVER)
+// =================================================================
+
+function findEmpty(board) {
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) if (board[r][c] === 0) return [r, c];
+    return null;
+}
+
+function isSafe(board, r, c, n) {
+    for (let x = 0; x < 9; x++) if (board[r][x] === n || board[x][c] === n) return false;
+    const startRow = r - r % 3, startCol = c - c % 3;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (board[i + startRow][j + startCol] === n) return false;
+    return true;
+}
+
+function fillBoard(board) {
+    const emptyPos = findEmpty(board);
+    if (!emptyPos) return true;
+    const [r, c] = emptyPos;
+    const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+    for (let num of numbers) {
+        if (isSafe(board, r, c, num)) {
+            board[r][c] = num;
+            if (fillBoard(board)) return true;
+            board[r][c] = 0;
+        }
+    }
+    return false;
+}
+
+function generateFullBoard() {
+    let board = Array.from({ length: 9 }, () => Array(9).fill(0));
+    fillBoard(board);
+    return board;
+}
+
+// =================================================================
+// 8. STORAGE & OTHER FEATURES
+// =================================================================
+
+function saveGameToStorage() {
+    const gameState = {
+        solutionBoard: sudokuState.solutionBoard,
+        currentBoard: sudokuState.currentBoard,
+        notesBoard: sudokuState.notesBoard.map(row => row.map(s => Array.from(s))),
+        history: sudokuState.history,
+        historyIndex: sudokuState.historyIndex,
+        mistakeCount: sudokuState.mistakeCount,
+        currentDifficultyName: sudokuState.currentDifficultyName,
+        liveCheck: sudokuState.liveCheck,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+}
+
+function loadGameFromStorage() {
+    const savedStateJSON = localStorage.getItem(STORAGE_KEY);
+    if (!savedStateJSON) return false;
+
+    const savedState = JSON.parse(savedStateJSON);
+    
+    sudokuState.solutionBoard = savedState.solutionBoard;
+    sudokuState.currentBoard = savedState.currentBoard;
+    sudokuState.notesBoard = savedState.notesBoard.map(row => row.map(arr => new Set(arr)));
+    sudokuState.history = savedState.history;
+    sudokuState.historyIndex = savedState.historyIndex;
+    sudokuState.mistakeCount = savedState.mistakeCount;
+    sudokuState.currentDifficultyName = savedState.currentDifficultyName;
+    sudokuState.liveCheck = savedState.liveCheck ?? false;
+
+    // Restore UI elements
+    mistakeCounterEl.textContent = sudokuState.mistakeCount;
+    difficultyDisplayEl.textContent = sudokuState.currentDifficultyName;
+    liveCheckToggle.checked = sudokuState.liveCheck;
+    
+    renderBoard();
+    updateUndoRedoButtons();
+
+    return true;
+}
+
+</script>
+</body>
+</html>
